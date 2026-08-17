@@ -127,9 +127,10 @@ graph TD
 
 * **执行目标**：高度还原客户未来复杂 Agent 任务中的多步串行交互、上下文滚雪球膨胀以及多 Agent 并发派生场景。
 
-#### 1. ReAct 多步决策链模拟设计
 * 运行自动化 ReAct Agent 仿真器，分别执行 **10 步、20 步、30 步** 串行循环：
-  $$\text{Loop}_k: \text{LLM Reasoning (Think)} \xrightarrow{\text{Generate Tool Call}} \text{Execute Mock Tool} \xrightarrow{\text{Return 5KB Data}} \text{Append Context} \xrightarrow{} \text{Loop}_{k+1}$$
+
+  $$\text{Loop}_k: \text{Think} \longrightarrow \text{Tool Call} \longrightarrow \text{Execute Tool} \longrightarrow \text{Append Context} \longrightarrow \text{Loop}_{k+1}$$
+
 * **上下文动态膨胀注入**：
   * Step 1: Context = 2 KB (500 tokens)
   * Step 10: Context = 45 KB (11,000 tokens)

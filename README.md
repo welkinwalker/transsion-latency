@@ -74,8 +74,11 @@
 
 > [!NOTE]
 > **TTFT 与 TTLT 物理计算公式**：
-> $$\text{TTFT} = T_{\text{DNS}} + T_{\text{TCP}} + T_{\text{TLS}} + T_{\text{Upload}} + T_{\text{Prefill\_Compute}} + 0.5 \times \text{RTT}$$
-> $$\text{TTLT} = \text{TTFT} + T_{\text{Decode\_Compute}} + T_{\text{Stream\_Transport}} + T_{\text{Loss\_Retransmit}}$$
+>
+> $$\text{TTFT} = T_{\text{DNS}} + T_{\text{TCP}} + T_{\text{TLS}} + T_{\text{Upload}} + T_{\text{Prefill}} + 0.5 \times \text{RTT}$$
+>
+> $$\text{TTLT} = \text{TTFT} + T_{\text{Decode}} + T_{\text{Stream}} + T_{\text{Loss}}$$
+
 
 ---
 
