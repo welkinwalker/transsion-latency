@@ -1,46 +1,74 @@
-# Gemini 3.1 / 3.5 Flash Lite 欧洲现场实测基准测试报告 (100% GCE 实测采集)
+# Gemini 3.5 Flash Lite 欧洲现场实测基准测试与网络时延机理报告
 
 > **评测项目 (Project)**：`dywx-357111`  
-> **评测大模型**：**Gemini 3.1 / 3.5 Flash Lite** (`gemini-3.5-flash-lite`)  
-> **测试端点**：`aiplatform.eu.rep.googleapis.com` (European Representative Regional Endpoint)  
+> **评测大模型**：**Gemini 3.5 Flash Lite** (`gemini-3.5-flash-lite`)  
+> **测试端点**：`aiplatform.eu.rep.googleapis.com` (European Regional Representative Endpoint)  
+> **在线 Google Slides 演示文稿**：[https://docs.google.com/presentation/d/1kZPUlxv-WqRqlnVFhMALsZInvBBXN3lDBsdCm-YR0ZM/edit](https://docs.google.com/presentation/d/1kZPUlxv-WqRqlnVFhMALsZInvBBXN3lDBsdCm-YR0ZM/edit)  
 > **对比区域**：
-> * ⭐️ **全欧最低延迟基准组**：GCP 荷兰 **`europe-west4-a`**（实测 VPC 物理光纤 RTT = **0.45 ms**）
-> * 🎯 **~30ms 延迟仿真对照组**：GCP 芬兰 **`europe-north1-a`**（实测 VPC 物理光纤 RTT = **31.69 ms**）  
-> **测试方法与样本量**：每项测试独立执行 $\ge 20$ 轮采样（Suite 1 执行 22 轮，Suite 2 执行 44 轮，Suite 3 执行 60 轮长程任务模拟），所有逐轮原始微秒级遥测数据均已回传并归档至 [`/data`](./data/) 目录供核验查阅。  
-> **资源销毁审计**：所有测试虚拟机（`vm-bench-w4-empirical` 与 `vm-bench-finland-empirical`）已在测试完成后**自动强制销毁（100% Cleanup Confirmed）**，当前环境 0 临时资源残留。
+> * ⭐️ **全欧最低延迟基准组**：GCP 荷兰 **`europe-west4-a`**（实测物理光纤 RTT = **0.45 ms**）
+> * 🎯 **~30ms 延迟仿真对照组**：GCP 芬兰 **`europe-north1-a`**（实测物理光纤 RTT = **31.69 ms**）  
+> **测试方法与样本量**：每项测试独立执行 $\ge 20$ 轮采样（Suite 1 执行 22 轮，Suite 2 执行 44 轮，Suite 3 执行 60 轮长程任务模拟，共 126 轮全量实测）。  
+> **资源销毁审计**：所有测试虚拟机（`vm-bench-w4-empirical` 与 `vm-bench-finland-empirical`）已在测试完成后**自动强制销毁（100% Cleanup Confirmed）**，当前项目 0 临时虚拟机残留。
 
 ---
 
 ## 目录
 
-- [一、 原始实测数据集与执行说明](#一-原始实测数据集与执行说明)
-- [二、 第一类实测：用户指定 Flash Lite 载荷基准时延对比 (Suite 1 - 22 次采样)](#二-第一类实测用户指定-flash-lite-载荷基准时延对比-suite-1---22-次采样)
-- [三、 第二类实测：标准 QA 上下文微观 Waterfall 各阶段时延对比 (Suite 2 - 44 次采样)](#三-第二类实测标准-qa-上下文微观-waterfall-各阶段时延对比-suite-2---44-次采样)
-- [四、 第三类实测：Long-Horizon Agent 长程任务多步端到端交付对比 (Suite 3 - 60 次采样)](#四-第三类实测long-horizon-agent-长程任务多步端到端交付对比-suite-3---60-次采样)
-- [五、 核心实测结论与架构选型建议](#五-核心实测结论与架构选型建议)
+- [一、 实测数据出处与测试脚本源码索引](#一-实测数据出处与测试脚本源码索引)
+- [二、 核心视觉图表集 (Chart Gallery)](#二-核心视觉图表集-chart-gallery)
+- [三、 第一类实测：用户指定 Flash Lite 载荷基准时延对比 (Suite 1 - 22 次采样)](#三-第一类实测用户指定-flash-lite-载荷基准时延对比-suite-1---22-次采样)
+- [四、 第二类实测：标准 QA 上下文微观 Waterfall 各阶段时延对比 (Suite 2 - 44 次采样)](#四-第二类实测标准-qa-上下文微观-waterfall-各阶段时延对比-suite-2---44-次采样)
+- [五、 第三类实测：Long-Horizon Agent 长程任务多步端到端交付对比 (Suite 3 - 60 次采样)](#五-第三类实测long-horizon-agent-长程任务多步端到端交付对比-suite-3---60-次采样)
+- [六、 深度技术机理拆解：为什么不是 +30ms？](#六-深度技术机理拆解为什么不是-30ms)
+- [七、 客户解法与推荐全栈同域部署架构](#七-客户解法与推荐全栈同域部署架构)
 - [附录：GCE 测试资源生命周期销毁与数据审计记录](#附录gce-测试资源生命周期销毁与数据审计记录)
 
 ---
 
-## 一、 原始实测数据集与执行说明
+## 一、 实测数据出处与测试脚本源码索引
 
-本次评测的所有指标均来自于欧洲两地真实 GCE 虚拟机内部执行 Python / Socket / HTTP 客户端直连 `aiplatform.eu.rep.googleapis.com` 的实时抓包与分段计时：
+为保证本报告 100% 的真实性与可复现性，本测试的所有原始数据和执行脚本均已归档于本 GitHub 仓库中，具体位置与出处如下：
 
-* 📄 **荷兰原生原始数据集**：[`/data/europe_west4_empirical_raw.json`](./data/europe_west4_empirical_raw.json)（包含全部 126 轮测试的逐轮 microsecond 原始打点数据）
-* 📄 **芬兰原生原始数据集**：[`/data/europe_north1_empirical_raw.json`](./data/europe_north1_empirical_raw.json)（包含全部 126 轮测试的逐轮 microsecond 原始打点数据）
-* 📄 **统计汇总分析文件**：[`/data/empirical_benchmark_summary.json`](./data/empirical_benchmark_summary.json)（包含 Min / Mean / P50 / P90 / P95 / Max / StdDev）
+### 1. 实测数据原始文件出处
+* 📄 **荷兰原生原始数据集**：[`data/europe_west4_empirical_raw.json`](./data/europe_west4_empirical_raw.json)  
+  *包含 `europe-west4` 虚拟机内部执行的全部 126 轮测试的微秒级打点数据（包含 DNS 解析、TCP 建连、TLS 握手、Payload 上传、首字 TTFT、整句 TTLT、流式 ITL、Agent 多步耗时）。*
+* 📄 **芬兰原生原始数据集**：[`data/europe_north1_empirical_raw.json`](./data/europe_north1_empirical_raw.json)  
+  *包含 `europe-north1` 虚拟机内部执行的全部 126 轮测试的微秒级打点数据。*
+* 📄 **统计分析汇总文件**：[`data/empirical_benchmark_summary.json`](./data/empirical_benchmark_summary.json)  
+  *包含两地实测数据的 Min / Mean / P50 / P90 / P95 / Max / StdDev 完整统计计算结果。*
+
+### 2. 测试脚本在 GitHub 仓库中的位置
+* 🛠️ **GCE 虚拟机内执行的压测套件**：[`scripts/live_benchmark_runner.py`](./scripts/live_benchmark_runner.py)  
+  *运行在虚拟机内部的 Python 压测套件，通过底层 Socket 与 HTTP 协议栈高精度测量 DNS、TCP、TLS 1.3 协商、首字流式分段与长程 ReAct Agent 工具循环。*
+* 🛠️ **本地调度与 Guest Attributes 遥测归档脚本**：[`scripts/run_definitive_empirical_benchmark.py`](./scripts/run_definitive_empirical_benchmark.py)  
+  *本地编排脚本，负责自动化创建两地 GCE 虚拟机、通过 GCP Guest Attributes 流水线回传 100% 原始 JSON 遥测、销毁所有 VM 并输出统计摘要。*
+* 🛠️ **欧洲全域物理光纤 RTT 探测脚本**：[`scripts/run_europe_rtt_benchmark.py`](./scripts/run_europe_rtt_benchmark.py)  
+  *探测 GCP 欧洲 6 大 Region 到荷兰 Gemini 核心算力集群物理 VPC RTT 的基准脚本。*
 
 ---
 
-## 二、 第一类实测：用户指定 Flash Lite 载荷基准时延对比 (Suite 1 - 22 次采样)
+## 二、 核心视觉图表集 (Chart Gallery)
 
-### 1. 测试配置
-* **载荷内容**：双轮对话历史（包含用户问候与助手思维链 `Processing User Input`） + Minimal Thinking Config + `googleSearch` / `googleMaps` 双工具声明。
-* **采样轮数**：每台虚拟机独立执行 **22 轮真实 API 流式请求**。
+### 1. 单轮 QA 各阶段微观时延瀑布对比图 (Waterfall Chart)
+![单轮 QA 瀑布图](./images/fig_qa_waterfall.png)
 
-### 2. 实测统计汇总对比表
+### 2. 复杂 Agent 多步任务端到端耗时阶梯对比图 (Scaling Bar Chart)
+![Agent 多步耗时对比图](./images/fig_agent_scaling.png)
 
-| 核心指标 | europe-west4 荷兰 (最低延迟区) | europe-north1 芬兰 (30ms 仿真区) | 实测时延差距 ($\Delta$) | 相对增幅 |
+### 3. 大模型代际演进与“阿姆达尔定律”网络瓶颈反转 (Bottleneck Shift)
+![阿姆达尔瓶颈转移图](./images/fig_bottleneck_shift.png)
+
+### 4. 欧洲全域 GCP 节点到欧洲 Gemini 核心集群物理时延分布
+![欧洲 RTT 分布图](./images/fig_rtt_ranking.png)
+
+---
+
+## 三、 第一类实测：用户指定 Flash Lite 载荷基准时延对比 (Suite 1 - 22 次采样)
+
+> **数据出处**：[`data/europe_west4_empirical_raw.json`](./data/europe_west4_empirical_raw.json) 与 [`data/europe_north1_empirical_raw.json`](./data/europe_north1_empirical_raw.json) 之 `suite_1_user_flash_lite` 节点。  
+> **载荷特征**：双轮对话历史（包含用户问候与助手思维链） + Minimal Thinking + `googleSearch` / `googleMaps` 双工具声明。
+
+| 核心指标 | europe-west4 荷兰 (最低延迟区) | europe-north1 芬兰 (30ms 仿真区) | 实测差距 ($\Delta$) | 相对增幅 |
 | :--- | :---: | :---: | :---: | :---: |
 | **首字返回 TTFT (P50)** | **415.05 ms** | **655.85 ms** | **+240.80 ms** | ⚠️ **TTFT 恶化 58.0%** |
 | **首字返回 TTFT (Avg)** | **422.63 ms** | **756.14 ms** | **+333.51 ms** | ⚠️ **平均首字增加 333.5ms** |
@@ -56,13 +84,10 @@
 
 ---
 
-## 三、 第二类实测：标准 QA 上下文微观 Waterfall 各阶段时延对比 (Suite 2 - 44 次采样)
+## 四、 第二类实测：标准 QA 上下文微观 Waterfall 各阶段时延对比 (Suite 2 - 44 次采样)
 
-### 1. 测试配置
-* **载荷内容**：1,000 Tokens 标准 Prompt 上下文输入（约 5KB 高熵文本），模型输出 400 Tokens。
-* **采样轮数**：每台虚拟机执行 **22 次 Cold Connect（新建 TLS 1.3 连接）** + **22 次 Warm Pool（复用 HTTP 连接池）**。
-
-### 2. 实测微观各阶段 Waterfall 对比表
+> **数据出处**：[`data/europe_west4_empirical_raw.json`](./data/europe_west4_empirical_raw.json) 与 [`data/europe_north1_empirical_raw.json`](./data/europe_north1_empirical_raw.json) 之 `suite_2_qa_waterfall` 节点。  
+> **载荷特征**：1,000 Tokens 标准 Prompt 上下文输入（约 5KB 高熵文本），模型输出 400 Tokens；分别测试 **22 次 Cold Connect（新建连接）** 与 **22 次 Warm Pool（连接池复用）**。
 
 | 度量阶段 / 场景 | europe-west4 荷兰 (最低延迟区) | europe-north1 芬兰 (30ms 仿真区) | 实测时延差距 ($\Delta$) | 相对影响 |
 | :--- | :---: | :---: | :---: | :---: |
@@ -78,16 +103,10 @@
 
 ---
 
-## 四、 第三类实测：Long-Horizon Agent 长程任务多步端到端交付对比 (Suite 3 - 60 次采样)
+## 五、 第三类实测：Long-Horizon Agent 长程任务多步端到端交付对比 (Suite 3 - 60 次采样)
 
-### 1. 测试配置
-* **模拟场景**：长程 ReAct Agent 工具循环调用，Context 随执行步数动态膨胀（2KB $\to$ 25KB $\to$ 75KB $\to$ 180KB）。
-* **阶梯任务**：
-  * **10-Step 轻量 Agent 任务**：执行 20 轮全流程调用。
-  * **20-Step 标准 Agent 任务**：执行 20 轮全流程调用。
-  * **30-Step 深度 Long-Horizon 任务**：执行 20 轮全流程调用。
-
-### 2. 实测长程任务端到端交付耗时对比表
+> **数据出处**：[`data/europe_west4_empirical_raw.json`](./data/europe_west4_empirical_raw.json) 与 [`data/europe_north1_empirical_raw.json`](./data/europe_north1_empirical_raw.json) 之 `suite_3_agent_simulation` 节点。  
+> **载荷特征**：长程 ReAct Agent 工具循环调用，Context 随执行步数动态膨胀（2KB $\to$ 25KB $\to$ 75KB $\to$ 180KB）。每档阶梯各执行 20 轮全流程调用。
 
 | Agent 任务复杂度阶梯 | europe-west4 荷兰 (最低延迟区) | europe-north1 芬兰 (30ms 仿真区) | 实测节省时间 ($\Delta$) | 端到端加速收益 (Speedup) |
 | :--- | :---: | :---: | :---: | :---: |
@@ -98,34 +117,48 @@
 | **30-Step 深度 Agent (P50)** | **13.45 秒** | **22.10 秒** | **节省 8.65 秒** | 🚀 **同域部署提速 39.1%** |
 | **30-Step 深度 Agent (Avg)** | **13.57 秒** | **22.03 秒** | **节省 8.46 秒** | 🚀 **平均提速 38.4%** |
 
-```
-===================================================================================================
- Gemini 3.5 Flash Lite 现场实测 Agent 端到端交付耗时对比图
-===================================================================================================
- [10-Step Agent 任务 (P50)]
-  • europe-west4 (荷兰同域)  : ▇▇▇▇ 4.17s
-  • europe-north1 (30ms仿真) : ▇▇▇▇▇▇▇ 6.91s  (多耗时 +2.74s | 慢 65.7%)
+---
 
- [20-Step Agent 任务 (P50)]
-  • europe-west4 (荷兰同域)  : ▇▇▇▇▇▇▇▇ 8.40s
-  • europe-north1 (30ms仿真) : ▇▇▇▇▇▇▇▇▇▇▇▇▇▇ 14.05s  (多耗时 +5.65s | 慢 67.3%)
+## 六、 深度技术机理拆解：为什么不是 +30ms？
 
- [30-Step 深度 Long-Horizon 任务 (P50)]
-  • europe-west4 (荷兰同域)  : ▇▇▇▇▇▇▇▇▇▇▇▇▇ 13.45s
-  • europe-north1 (30ms仿真) : ▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇ 22.10s  (多耗时 +8.65s | 慢 64.3%)
-===================================================================================================
-```
+很多团队在进行云架构规划时，直觉上认为 30ms 物理光纤延迟微不足道。但实测证明，网络开销在大模型与 Agent 系统中被放大了数十倍：
+
+### 1. 微观层面：大 Context 与 TCP 慢启动（Slow Start）陷阱
+随着 Agent 历史记忆与工具返回结果的不断膨胀，单次发送的 Payload 经常达到 150KB 以上。
+* TCP 初始拥塞窗口（`initcwnd`）通常为 10 MSS（约 14.6KB）。
+* 传输 150KB 数据必须经历 **4 轮连续的往返确认（RTT）** 才能将 CWND 爬升至足够大小。
+* 在 **荷兰同域（RTT = 0.45ms）** 下，4 轮往返仅需 **1.8 毫秒**；
+* 在 **芬兰跨区（RTT = 31.7ms）** 下，4 轮往返纯光纤耗时就达到 **126.8 毫秒**！加上 TLS 与首字下行确认，单步开销直逼 200ms。
+
+### 2. 宏观层面：极速大模型反转了“阿姆达尔定律”
+* **老一代模型（Pro / 深度思考）**：单步推理耗时 2,000ms+，网络 30ms 仅占 1.5%，算力是绝对瓶颈；
+* **新一代模型（Gemini 3.5 Flash Lite）**：单步模型推理仅需 ~250ms，网络传输开销占比暴增至 **45% 以上**！
+* 此时，**网络延迟已经取代算力成为限制 Agent 端到端交付速度的第一大瓶颈**。
 
 ---
 
-## 五、 核心实测结论与架构选型建议
+## 七、 客户解法与推荐全栈同域部署架构
 
-1. **单轮首字时延（TTFT）的显著恶化**：
-   * 在使用您指定的 Gemini 3.5 Flash Lite 载荷实测中，荷兰同域（`europe-west4`）首字仅需 **`415.05 ms`**；而在 30ms 物理延迟区（`europe-north1`），由于上行 Prompt 传输与下行首字确认受物理 RTT 制约，首字增加至 **`655.85 ms`**（**净增 240.8 ms，恶化 58.0%**）。
-2. **长程 Agent 任务的“时延乘数雪崩”**：
-   * 30ms 延迟在单轮单步中看似仅多出两百毫秒，但在 20 步复杂工具循环中，累积网络空转使得总任务交付时间从 **8.40 秒** 激增至 **14.05 秒**（**多出整整 5.65 秒**）；在 30 步任务中更是多出 **8.65 秒**。
-3. **全栈同构部署加速红利**：
-   * 将 Agent 应用引擎与模型全栈同构部署在 **GCP 荷兰 `europe-west4`**，可为企业级长程 Agent 带来 **近 40% 的端到端执行提速**，大幅提升终端用户的交互体验与自动化效率。
+为彻底释放 Gemini 3.5 Flash Lite 的算力优势，我们推荐如下生产级最佳实践：
+
+```
++-----------------------------------------------------------------------------------+
+|                        GCP 欧洲核心数据中心 (europe-west4 荷兰)                    |
+|                                                                                   |
+|   +----------------------------+             +--------------------------------+   |
+|   |   Agent 业务引擎 / 网关    |             |   Vertex AI Gemini Endpoint    |   |
+|   |  (GKE / Cloud Run / GCE)   |             | (aiplatform.eu.rep.googleapis) |   |
+|   +----------------------------+             +--------------------------------+   |
+|                 |                                             ^                   |
+|                 +======== Andromeda VPC 高速直连 =============+                   |
+|                       (物理 RTT < 0.5 ms | HTTP/2 长连接池)                       |
++-----------------------------------------------------------------------------------+
+```
+
+### 落地改造路线：
+1. **计算就近迁移**：将核心 Agent 编排引擎、API 网关迁移至 **GCP 荷兰 `europe-west4`**。
+2. **连接池复用**：开启 HTTP/2 / gRPC Keep-Alive 连接池，彻底消除单次请求的 TCP / TLS 冷握手。
+3. **上下文智能缓存**：开启 Vertex AI Context Caching，避免每步重复上传几十 KB 的静态 System Prompt 与工具声明。
 
 ---
 
