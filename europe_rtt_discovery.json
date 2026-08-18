@@ -1,0 +1,38 @@
+[
+  {
+    "vm_name": "vm-probe-w4",
+    "region": "europe-west4",
+    "zone": "europe-west4-a",
+    "metrics": null
+  },
+  {
+    "vm_name": "vm-probe-belgium",
+    "region": "europe-west1",
+    "zone": "europe-west1-b",
+    "metrics": null
+  },
+  {
+    "vm_name": "vm-probe-frankfurt",
+    "region": "europe-west3",
+    "zone": "europe-west3-a",
+    "metrics": null
+  },
+  {
+    "vm_name": "vm-probe-warsaw",
+    "region": "europe-central2",
+    "zone": "europe-central2-a",
+    "metrics": null
+  },
+  {
+    "vm_name": "vm-probe-finland",
+    "region": "europe-north1",
+    "zone": "europe-north1-a",
+    "metrics": null
+  },
+  {
+    "vm_name": "vm-probe-madrid",
+    "region": "europe-southwest1",
+    "zone": "europe-southwest1-a",
+    "metrics": null
+  }
+]
